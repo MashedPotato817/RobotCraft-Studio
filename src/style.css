@@ -57,7 +57,6 @@ input[type="number"] { display: block; width: 100%; padding: 8px 10px; margin-to
 .swatches { display: flex; gap: 9px; }
 .swatch { background: var(--swatch); border: 3px solid #fffefa; outline: 1px solid transparent; width: 21px; height: 21px; border-radius: 50%; }
 .swatch[aria-pressed="true"] { outline-color: #9da99e; }
-.advanced { margin-top: 17px; padding-top: 12px; border-top: 1px solid #ecf0e9; font-size: 10px; color: #7d8b80; }
 summary { cursor: pointer; user-select: none; }
 .plan-card { margin-top: 22px; border: 1px solid #e0e6dc; border-radius: 7px; padding: 12px; background: #f7f9f3; }
 .plan-card > div { display: flex; align-items: center; gap: 7px; }

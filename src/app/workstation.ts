@@ -40,10 +40,6 @@ export function mountWorkstation(root: HTMLElement): () => void {
           <label class="range-label" for="drawSpeedMmS"><span>目标绘制速度</span><output id="drawSpeedMmSValue">18 mm/s</output></label>
           <input id="drawSpeedMmS" data-setting="drawSpeedMmS" type="range" min="5" max="60" step="1" value="18"/>
           <div class="color-row"><span>笔迹颜色</span><div class="swatches">${[['#24465f', '墨蓝'], ['#c0643b', '赭橙'], ['#527961', '森林绿']].map(([color, label], i) => `<button class="swatch" style="--swatch:${color}" data-color="${color}" aria-label="${label}" aria-pressed="${i === 0}"></button>`).join('')}</div></div>
-          <details class="advanced"><summary>工具与纸面参数</summary><div class="input-pair">
-            <label>笔长 <span>mm</span><input id="penLengthMm" data-setting="penLengthMm" type="number" min="12" max="40" step="1" value="24" required/></label>
-            <label>纸面高度 <span>mm</span><input id="surfaceZmm" data-setting="surfaceZmm" type="number" min="30" max="70" step="1" value="50" required/></label>
-          </div></details>
         </section>
         <div class="plan-card"><div><span class="status-dot"></span><strong id="planHeading">准备轨迹</strong><button id="replan" class="text-button" title="重新生成轨迹">重新规划 ↗</button></div><p id="planStatus" role="status">正在建立笔尖与纸面的关系…</p><dl><div><dt>笔尖最大偏差</dt><dd id="maxError">—</dd></div><div><dt>笔画</dt><dd id="strokeTotal">—</dd></div></dl></div>
       </aside>
@@ -61,7 +57,7 @@ export function mountWorkstation(root: HTMLElement): () => void {
           <div class="timeline"><div><strong id="phaseLabel">准备中</strong><span id="timeLabel">0.0 / — s</span></div><progress id="progress" max="1" value="0" aria-label="绘制进度"></progress></div>
           <label class="speed-control">播放速度<select id="speed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
         </div>
-        <footer class="workspace-footer"><span id="drawnCount">已绘笔画 0 / —</span><span>运动学与笔迹几何仿真 · 未检查碰撞</span><details class="telemetry"><summary>关节数据</summary><div id="jointData"></div></details></footer>
+        <footer class="workspace-footer"><span id="drawnCount">已绘笔画 0 / —</span><span>画板几何检查 · 未检查其他碰撞</span><details class="telemetry"><summary>关节数据</summary><div id="jointData"></div></details></footer>
       </section>
     </main>`;
 

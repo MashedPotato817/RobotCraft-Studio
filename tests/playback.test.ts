@@ -58,7 +58,7 @@ describe('确定性笔绘播放', () => {
     player.play(); player.advance(1000);
     const ink = player.snapshot().ink;
     expect(new Set(ink.map(s => s.stroke)).size).toBe(4);
-    expect(ink.every(s => Math.abs(s.start[2] - 50) <= 0.5 && Math.abs(s.end[2] - 50) <= 0.5)).toBe(true);
+    expect(ink.every(s => Math.abs(s.start[2]) <= 0.5 && Math.abs(s.end[2]) <= 0.5)).toBe(true);
     expect(ink.every(s => Math.hypot(...s.end.map((v, i) => v - s.start[i])) < 2)).toBe(true);
   });
 

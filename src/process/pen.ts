@@ -22,15 +22,20 @@ export interface PenJob {
   targets: PenTarget[];
 }
 
+export const drawingBoard = {
+  centerXmm: 110, centerYmm: 0, widthMm: 156, depthMm: 116,
+  thicknessMm: 4, sheetGapMm: 0.5,
+} as const;
+
 export const defaultPenSettings: PenSettings = {
   pattern: 'robot', sizeMm: 44, centerXmm: 110, centerYmm: 0,
-  surfaceZmm: 50, penLengthMm: 24, drawSpeedMmS: 18,
+  surfaceZmm: 0, penLengthMm: 24, drawSpeedMmS: 18,
 };
 
 export function createPenJob(settings: PenSettings): PenJob {
   const limits: [keyof Omit<PenSettings, 'pattern'>, number, number][] = [
     ['sizeMm', 20, 60], ['centerXmm', 80, 140], ['centerYmm', -20, 20],
-    ['surfaceZmm', 30, 70], ['penLengthMm', 12, 40], ['drawSpeedMmS', 5, 60],
+    ['surfaceZmm', 0, 70], ['penLengthMm', 12, 40], ['drawSpeedMmS', 5, 60],
   ];
   for (const [key, min, max] of limits) {
     if (!Number.isFinite(settings[key]) || settings[key] < min || settings[key] > max) {

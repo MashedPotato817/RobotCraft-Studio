@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { robotPose, restingQ } from '../robot/planner';
-import type { PenJob } from '../process/pen';
+import { defaultPenSettings, drawingBoard, type PenJob } from '../process/pen';
 import type { PlaybackSnapshot } from '../simulation/playback';
 
 const zAxis = new THREE.Vector3(0, 0, 1);
@@ -23,8 +23,8 @@ export class Workspace {
   private readonly inkMaterial = new THREE.MeshStandardMaterial({ color: '#24465f', roughness: 1 });
   private readonly inkGeometry = new THREE.CylinderGeometry(1, 1, 1, 6);
   private ink = new THREE.InstancedMesh(this.inkGeometry, this.inkMaterial, 1);
-  private penLengthMm = 24;
-  private surfaceZmm = 50;
+  private penLengthMm = defaultPenSettings.penLengthMm;
+  private surfaceZmm = defaultPenSettings.surfaceZmm;
   private frameAxes = new THREE.AxesHelper(14);
   private readonly matrix = new THREE.Matrix4();
   private readonly observer: ResizeObserver;
@@ -95,11 +95,11 @@ export class Workspace {
     this.scene.add(this.robot, this.frameAxes, this.guide, this.paper);
     this.frameAxes.visible = false;
 
-    const board = new THREE.Mesh(new THREE.BoxGeometry(156, 116, 4), new THREE.MeshStandardMaterial({ color: '#bca98c', roughness: 0.9 }));
-    board.position.set(110, 0, -2.5);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(drawingBoard.widthMm, drawingBoard.depthMm, drawingBoard.thicknessMm), new THREE.MeshStandardMaterial({ color: '#bca98c', roughness: 0.9 }));
+    board.position.set(drawingBoard.centerXmm, drawingBoard.centerYmm, -drawingBoard.sheetGapMm - drawingBoard.thicknessMm / 2);
     board.receiveShadow = true;
-    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(150, 110), new THREE.MeshStandardMaterial({ color: '#fffdf6', roughness: 1, side: THREE.DoubleSide }));
-    sheet.position.set(110, 0, 0);
+    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(drawingBoard.widthMm - 6, drawingBoard.depthMm - 6), new THREE.MeshStandardMaterial({ color: '#fffdf6', roughness: 1, side: THREE.DoubleSide }));
+    sheet.position.set(drawingBoard.centerXmm, drawingBoard.centerYmm, 0);
     sheet.receiveShadow = true;
     this.paper.add(board, sheet);
     const paperGrid: number[] = [];
