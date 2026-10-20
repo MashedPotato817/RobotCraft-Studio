@@ -8,7 +8,7 @@
 
 2026-10-20：已实现笔绘、奶油裱花双工艺演示，包含八自由度机械臂、可切换的末端工具与工件、轨迹规划和实际制作结果。两种工艺使用固定默认配置；SVG 导入和项目文件保存属于后续阶段。默认配置与六种组合验证见[实现记录](docs/superpowers/plans/2026-10-20-two-process-demo.md)。
 
-技术路线采用 TypeScript、Vite、Three.js、Vitest。原生 DOM/CSS 组织交互，Worker 计算规划，按仿真时间播放；计算、播放与渲染分离。依赖锁定沿用旧项目，本次没有升级或增加依赖。
+技术路线采用 TypeScript、Vite、Three.js、Vitest。原生 DOM/CSS 组织交互，Worker 计算规划，按仿真时间播放；计算、播放与渲染分离。浏览器演示检查使用 Playwright。
 
 ## 现在可以做什么
 
@@ -29,16 +29,36 @@
 5. 在左侧切换笔绘与奶油裱花，等待规划完成后播放，比较同一图案的不同效果。
 6. 点击“重置”清空结果；工艺和图案切换也会清空旧作品。规划未通过时点击“重新规划”，失败任务不能播放。
 
-## 本地运行
+## 本地部署与演示
 
-在项目目录（或对应 worktree 目录）执行 npm 原生命令：
+准备 Node.js 22 和 npm。首次获取项目时运行：
+
+```powershell
+git clone https://github.com/MashedPotato817/RobotCraft-Studio.git
+cd RobotCraft-Studio
+```
+
+如果已有仓库，直接进入项目目录（或对应 worktree 目录）。安装依赖并启动本地开发服务：
 
 ```powershell
 npm ci
 npm run dev
 ```
 
-打开 <http://127.0.0.1:5174/>。端口与旧项目的 5173 分开。
+打开 <http://127.0.0.1:5174/>。端口与旧项目的 5173 分开；演示结束后在终端按 `Ctrl+C` 停止服务。
+
+需要在本机按部署后的版本演示时，先构建，再启动生产构建预览：
+
+```powershell
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
+```
+
+打开 <http://127.0.0.1:4174/>。构建文件在 `dist/`；预览服务只在本机运行，结束后按 `Ctrl+C`。
+
+课堂上可按以下顺序走一遍：等待“轨迹就绪” → 选择汉字「中」并点击“开始制作” → 暂停、继续、俯视检查笔迹 → 选择“奶油裱花”并等待重新规划 → 再次开始，观察蛋糕上的奶油条带。更详细的操作见上方“课堂演示步骤”。
+
+线上演示已部署在 <https://mashedpotato817.github.io/RobotCraft-Studio/>。
 
 ## 验证
 
@@ -46,13 +66,15 @@ npm run dev
 npm run typecheck
 npm run test
 npm run build
+npx playwright install chromium
+npm run test:e2e
 ```
 
-当前 39 项测试覆盖旧算法回归、TCP/单位换算、六种工艺与图案组合、抬笔与出料语义、确定性播放和工件几何间隙。回归测试包含高画板穿模拒绝，以及连杆端点、段内插值与关节半径的检查。类型检查和完整生产构建已通过。
+单元测试覆盖旧算法回归、TCP/单位换算、六种工艺与图案组合、抬笔与出料语义、确定性播放和工件几何间隙。浏览器检查会打开本地生产构建，验证页面、笔绘和奶油裱花的完整演示。`npm run test:e2e` 会自动启动和停止本地预览服务；需先运行 `npm run build`。
+
+如果本机无法下载 Playwright 浏览器，已有 Chrome 的 Windows 用户可设置 `$env:PLAYWRIGHT_CHROME_PATH='C:\Program Files\Google\Chrome\Application\chrome.exe'` 后运行 `npm run test:e2e`。
 
 Windows 的构建入口会为子进程使用 `.cache/tmp`，避免当前机器共享临时目录中 esbuild 删除文件被拒绝；不修改系统环境或权限。构建输出独立的 Three.js、视角控制与规划 Worker 文件。
-
-可通过 `npm run preview -- --host 127.0.0.1 --port 4174 --strictPort` 查看生产构建。
 
 ## 使用边界
 
