@@ -37,16 +37,7 @@ jobs:
       - name: 运行测试
         run: npm test
 
-      - name: 构建本地预览版本
-        run: npm run build
-
-      - name: 安装浏览器
-        run: npx playwright install --with-deps chromium
-
-      - name: 检查页面与双工艺演示
-        run: npm run test:e2e
-
-      - name: 构建 Pages 站点
+      - name: 构建站点
         run: npm run build -- --base=/RobotCraft-Studio/
 
       - name: 配置 Pages

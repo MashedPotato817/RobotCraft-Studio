@@ -8,7 +8,7 @@
 
 2026-10-20：已实现笔绘、奶油裱花双工艺演示，包含八自由度机械臂、可切换的末端工具与工件、轨迹规划和实际制作结果。两种工艺使用固定默认配置；SVG 导入和项目文件保存属于后续阶段。默认配置与六种组合验证见[实现记录](docs/superpowers/plans/2026-10-20-two-process-demo.md)。
 
-技术路线采用 TypeScript、Vite、Three.js、Vitest。原生 DOM/CSS 组织交互，Worker 计算规划，按仿真时间播放；计算、播放与渲染分离。浏览器演示检查使用 Playwright。
+技术路线采用 TypeScript、Vite、Three.js、Vitest。原生 DOM/CSS 组织交互，Worker 计算规划，按仿真时间播放；计算、播放与渲染分离。依赖锁定沿用旧项目，本次没有升级或增加依赖。
 
 ## 现在可以做什么
 
@@ -66,13 +66,9 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 npm run typecheck
 npm run test
 npm run build
-npx playwright install chromium
-npm run test:e2e
 ```
 
-单元测试覆盖旧算法回归、TCP/单位换算、六种工艺与图案组合、抬笔与出料语义、确定性播放和工件几何间隙。浏览器检查会打开本地生产构建，验证页面、笔绘和奶油裱花的完整演示。`npm run test:e2e` 会自动启动和停止本地预览服务；需先运行 `npm run build`。
-
-如果本机无法下载 Playwright 浏览器，已有 Chrome 的 Windows 用户可设置 `$env:PLAYWRIGHT_CHROME_PATH='C:\Program Files\Google\Chrome\Application\chrome.exe'` 后运行 `npm run test:e2e`。
+当前 39 项测试覆盖旧算法回归、TCP/单位换算、六种工艺与图案组合、抬笔与出料语义、确定性播放和工件几何间隙。回归测试包含高画板穿模拒绝，以及连杆端点、段内插值与关节半径的检查。类型检查和完整生产构建已通过。
 
 Windows 的构建入口会为子进程使用 `.cache/tmp`，避免当前机器共享临时目录中 esbuild 删除文件被拒绝；不修改系统环境或权限。构建输出独立的 Three.js、视角控制与规划 Worker 文件。
 

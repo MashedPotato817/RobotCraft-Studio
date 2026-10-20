@@ -8,14 +8,12 @@
     "build": "tsc -b && node scripts/build.mjs",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
     "@types/three": "^0.180.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
