@@ -21,7 +21,6 @@ export function mountWorkstation(root: HTMLElement): () => void {
     </header>
     <main class="studio">
       <aside class="sidebar" aria-label="创作参数">
-        <div class="sidebar-heading"><span class="eyebrow">CREATE / 创作</span><h1>让机械臂，画出来。</h1><p>选择图案，观察笔尖如何完成每一笔。</p></div>
         <section class="control-section"><h2><span class="step-number">01</span>末端工具</h2>
           <div class="tool-card"><span class="pen-symbol">✎</span><span><strong>绘图笔</strong><small>平面书写与线条绘制</small></span><span class="selected-check">✓</span></div>
           <p class="subtle-note">钻孔与裱花将在后续阶段加入</p>
