@@ -22,8 +22,10 @@ export class Workspace {
   private readonly paper = new THREE.Group();
   private readonly guide = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#6e9ab0', dashSize: 1.4, gapSize: 1, transparent: true, opacity: 0.55 }));
   private readonly inkMaterial = new THREE.MeshStandardMaterial({ color: '#24465f', roughness: 1 });
-  private readonly inkGeometry = new THREE.CylinderGeometry(1, 1, 1, 12);
+  private readonly inkGeometry = new THREE.CylinderGeometry(1, 1, 1, 24);
   private ink = new THREE.InstancedMesh(this.inkGeometry, this.inkMaterial, 1);
+  private readonly creamJointGeometry = new THREE.SphereGeometry(1, 24, 16);
+  private creamJoints = new THREE.InstancedMesh(this.creamJointGeometry, this.inkMaterial, 1);
   private penLengthMm = defaultPenSettings.penLengthMm;
   private surfaceZmm = defaultPenSettings.surfaceZmm;
   private config: ProcessConfig = processes.pen;
@@ -110,7 +112,9 @@ export class Workspace {
     this.paper.add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(paperGrid, 3)), new THREE.LineBasicMaterial({ color: '#e5e9e3', transparent: true, opacity: 0.7 })));
     this.ink.count = 0;
     this.ink.frustumCulled = false;
-    this.scene.add(this.ink);
+    this.creamJoints.count = 0;
+    this.creamJoints.frustumCulled = false;
+    this.scene.add(this.ink, this.creamJoints);
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
     this.resize();
@@ -148,6 +152,13 @@ export class Workspace {
     this.ink.frustumCulled = false;
     this.ink.count = 0;
     this.scene.add(this.ink);
+    this.scene.remove(this.creamJoints);
+    this.creamJoints.dispose();
+    this.creamJoints = new THREE.InstancedMesh(this.creamJointGeometry, this.inkMaterial, (job.targets.length + 1) * 2);
+    this.creamJoints.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.creamJoints.frustumCulled = false;
+    this.creamJoints.count = 0;
+    this.scene.add(this.creamJoints);
     this.inkMaterial.color.set(this.config.color);
     this.showPose(restingQ);
     if (this.viewMode === 'top') this.topView();
@@ -204,22 +215,37 @@ export class Workspace {
 
   show(snapshot: PlaybackSnapshot): void {
     this.showPose(snapshot.q);
+    const cream = this.config.id === 'cream';
+    let jointCount = 0;
+    const jointScale = new THREE.Vector3().setScalar(this.config.radiusMm);
+    const addJoint = (point: THREE.Vector3) => {
+      this.matrix.compose(point, new THREE.Quaternion(), jointScale);
+      this.creamJoints.setMatrixAt(jointCount++, this.matrix);
+    };
     snapshot.ink.forEach((segment, i) => {
       // 笔迹投影到纸面并微小抬高；奶油条带保留实际 TCP 高度。
-      const cream = this.config.id === 'cream';
       const start = new THREE.Vector3(segment.start[0], segment.start[1], cream ? segment.start[2] : this.surfaceZmm + 0.22);
       const end = new THREE.Vector3(segment.end[0], segment.end[1], cream ? segment.end[2] : this.surfaceZmm + 0.22);
       const direction = end.clone().sub(start);
       this.matrix.compose(start.clone().lerp(end, 0.5), new THREE.Quaternion().setFromUnitVectors(yAxis, direction.lengthSq() > 1e-12 ? direction.clone().normalize() : yAxis), new THREE.Vector3(this.config.radiusMm, Math.max(direction.length(), 0.001), this.config.radiusMm));
       this.ink.setMatrixAt(i, this.matrix);
+      if (cream) {
+        // 同半径球面覆盖圆柱平口，让转折与起止端圆润；独立笔画不生成桥接线。
+        const previous = snapshot.ink[i - 1];
+        if (!previous || previous.stroke !== segment.stroke || previous.end.some((value, axis) => value !== segment.start[axis])) addJoint(start);
+        addJoint(end);
+      }
     });
     this.ink.count = snapshot.ink.length;
     this.ink.instanceMatrix.needsUpdate = true;
+    this.creamJoints.count = jointCount;
+    this.creamJoints.instanceMatrix.needsUpdate = true;
   }
 
   setRobotVisible(visible: boolean): void { this.robot.visible = visible; }
   clearInk(): void {
     this.ink.count = 0;
+    this.creamJoints.count = 0;
   }
   setGuideVisible(visible: boolean): void { this.guide.visible = visible; }
   setAxesVisible(visible: boolean): void { this.frameAxes.visible = visible; }
@@ -274,6 +300,7 @@ export class Workspace {
     geometries.forEach(g => g.dispose());
     materials.forEach(m => m.dispose());
     this.ink.dispose();
+    this.creamJoints.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
