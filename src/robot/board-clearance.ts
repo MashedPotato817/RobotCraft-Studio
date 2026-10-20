@@ -1,17 +1,19 @@
 import { drawingBoard, type Point3 } from '../process/pen';
+import type { Workpiece } from '../process/craft';
 
 /** 连杆与关节采用半径 4.4 mm 的保守包络，并在画板外额外预留 2 mm。 */
-export function armClearsBoard(points: Point3[], surfaceZmm: number): boolean {
+export function armClearsBoard(points: Point3[], surfaceZmm: number, workpiece?: Workpiece): boolean {
+  const bounds = workpiece ?? { ...drawingBoard, topMm: surfaceZmm, bottomMm: surfaceZmm - drawingBoard.sheetGapMm - drawingBoard.thicknessMm };
   const padding = 4.4 + 2;
   const minimum = [
-    drawingBoard.centerXmm - drawingBoard.widthMm / 2 - padding,
-    drawingBoard.centerYmm - drawingBoard.depthMm / 2 - padding,
-    surfaceZmm - drawingBoard.sheetGapMm - drawingBoard.thicknessMm - padding,
+    bounds.centerXmm - bounds.widthMm / 2 - padding,
+    bounds.centerYmm - bounds.depthMm / 2 - padding,
+    bounds.bottomMm - padding,
   ];
   const maximum = [
-    drawingBoard.centerXmm + drawingBoard.widthMm / 2 + padding,
-    drawingBoard.centerYmm + drawingBoard.depthMm / 2 + padding,
-    surfaceZmm + padding,
+    bounds.centerXmm + bounds.widthMm / 2 + padding,
+    bounds.centerYmm + bounds.depthMm / 2 + padding,
+    bounds.topMm + padding,
   ];
   for (let i = 1; i < points.length; i++) {
     const start = points[i - 1];

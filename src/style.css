@@ -31,6 +31,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .eyebrow { display: block; color: #89998e; font: 10px/1.4 Consolas, monospace; letter-spacing: 1.8px; }
 .control-section { margin-top: 18px; }
 .control-section:first-child { margin-top: 0; }
+.process-list { display: grid; gap: 7px; }
+.process-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: #fafbf7; color: #63776c; text-align: left; }
+.process-card strong { font-size: 12px; font-weight: 600; }
+.process-card small { font-size: 10px; color: #859188; }
+.process-card:hover { border-color: #a7b7ad; }
+.process-card.selected { border-color: #bd7754; background: #fcf1e8; color: #a65e3c; }
+.config-summary { font-size: 11px; line-height: 1.8; color: #63776c; margin: 0; }
 h2 { margin: 0 0 13px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
 .step-number { font: 10px Consolas, monospace; color: #a5afa5; }
 .tool-card { display: flex; align-items: center; gap: 11px; padding: 12px; border: 1px solid #aabbad; border-radius: 7px; background: #f0f4ed; }
