@@ -27,7 +27,6 @@ export class Workspace {
   private penLengthMm = defaultPenSettings.penLengthMm;
   private surfaceZmm = defaultPenSettings.surfaceZmm;
   private config: ProcessConfig = processes.pen;
-  private holeCount = -1;
   private frameAxes = new THREE.AxesHelper(14);
   private readonly matrix = new THREE.Matrix4();
   private readonly observer: ResizeObserver;
@@ -121,27 +120,22 @@ export class Workspace {
 
   setJob(job: PenJob): void {
     this.config = job.config ?? processes.pen;
-    this.holeCount = -1;
     this.penLengthMm = job.settings.penLengthMm;
     this.surfaceZmm = job.settings.surfaceZmm;
-    this.buildWorkpiece([]);
+    this.buildWorkpiece();
     const cream = this.config.id === 'cream';
-    const drill = this.config.id === 'drill';
     this.toolBody.geometry.dispose();
-    this.toolBody.geometry = new THREE.CylinderGeometry(cream ? 1.8 : drill ? 2.5 : 1.9, cream ? 5 : drill ? 2.5 : 1.9, 1, 24);
-    (this.toolBody.material as THREE.MeshStandardMaterial).color.set(cream ? '#f3e2d3' : drill ? '#657a80' : '#294e63');
+    this.toolBody.geometry = new THREE.CylinderGeometry(cream ? 1.8 : 1.9, cream ? 5 : 1.9, 1, 24);
+    (this.toolBody.material as THREE.MeshStandardMaterial).color.set(cream ? '#f3e2d3' : '#294e63');
     this.toolTip.geometry.dispose();
-    this.toolTip.geometry = cream ? new THREE.CylinderGeometry(1.2, 1.8, 5, 24) : new THREE.ConeGeometry(drill ? 1.2 : 1.9, 5, 16);
-    (this.toolTip.material as THREE.MeshStandardMaterial).color.set(drill || cream ? '#b8c4c9' : '#c4a883');
+    this.toolTip.geometry = cream ? new THREE.CylinderGeometry(1.2, 1.8, 5, 24) : new THREE.ConeGeometry(1.9, 5, 16);
+    (this.toolTip.material as THREE.MeshStandardMaterial).color.set(cream ? '#b8c4c9' : '#c4a883');
     this.toolBody.scale.y = this.penLengthMm - 5;
     this.toolBody.position.z = (this.penLengthMm - 5) / 2;
     this.toolTip.position.z = this.penLengthMm - 2.5;
     const positions: number[] = [];
     job.targets.forEach((target, i) => {
-      if (this.config.id === 'drill' && target.phase === 'dwell') {
-        const [x, y] = target.position, z = this.config.workpiece.topMm;
-        positions.push(x - 1.5, y, z, x + 1.5, y, z, x, y - 1.5, z, x, y + 1.5, z);
-      } else if (target.ink !== null && i > 0) positions.push(...job.targets[i - 1].position, ...target.position);
+      if (target.ink !== null && i > 0) positions.push(...job.targets[i - 1].position, ...target.position);
     });
     this.guide.geometry.dispose();
     this.guide.geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -159,7 +153,7 @@ export class Workspace {
     if (this.viewMode === 'top') this.topView();
   }
 
-  private buildWorkpiece(holes: PlaybackSnapshot['holes']): void {
+  private buildWorkpiece(): void {
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     this.paper.traverse(object => {
@@ -171,7 +165,7 @@ export class Workspace {
     this.paper.clear();
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose());
     const w = this.config.workpiece;
-    const material = new THREE.MeshStandardMaterial({ color: this.config.id === 'cream' ? '#fff1d9' : this.config.id === 'drill' ? '#c5af89' : '#bca98c', roughness: 0.9 });
+    const material = new THREE.MeshStandardMaterial({ color: this.config.id === 'cream' ? '#fff1d9' : '#bca98c', roughness: 0.9 });
     if (w.shape === 'circle') {
       const cake = new THREE.Mesh(new THREE.CylinderGeometry(w.widthMm / 2, w.widthMm / 2, w.topMm - w.bottomMm, 96), material);
       cake.rotation.x = Math.PI / 2;
@@ -181,25 +175,6 @@ export class Workspace {
       const plate = new THREE.Mesh(new THREE.CylinderGeometry(w.widthMm / 2 + 5, w.widthMm / 2 + 5, 0.8, 96), new THREE.MeshStandardMaterial({ color: '#d5ded8', metalness: 0.3, roughness: 0.6 }));
       plate.rotation.x = Math.PI / 2; plate.position.set(w.centerXmm, w.centerYmm, w.bottomMm - 0.4);
       this.paper.add(plate);
-    } else if (this.config.id === 'drill') {
-      // 以带圆孔的二维轮廓挤出板材上层，底层保持完整，表示盲孔；不做实体布尔切削。
-      const shape = new THREE.Shape();
-      const x = w.centerXmm - w.widthMm / 2, y = w.centerYmm - w.depthMm / 2;
-      shape.moveTo(x, y); shape.lineTo(x + w.widthMm, y); shape.lineTo(x + w.widthMm, y + w.depthMm); shape.lineTo(x, y + w.depthMm); shape.closePath();
-      holes.forEach(hole => {
-        const path = new THREE.Path(); path.absarc(hole.tip[0], hole.tip[1], this.config.radiusMm, 0, Math.PI * 2, true); shape.holes.push(path);
-      });
-      const depth = this.config.holeDepthMm;
-      const upper = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 16 }), material);
-      upper.position.z = w.topMm - depth; upper.receiveShadow = true; upper.castShadow = true;
-      const bottom = new THREE.Mesh(new THREE.BoxGeometry(w.widthMm, w.depthMm, w.topMm - depth - w.bottomMm), material);
-      bottom.position.set(w.centerXmm, w.centerYmm, (w.topMm - depth + w.bottomMm) / 2); bottom.receiveShadow = true;
-      this.paper.add(upper, bottom);
-      holes.forEach(hole => {
-        const cap = new THREE.Mesh(new THREE.CircleGeometry(this.config.radiusMm, 24), new THREE.MeshStandardMaterial({ color: '#574b38', roughness: 1, side: THREE.DoubleSide }));
-        cap.position.set(hole.tip[0], hole.tip[1], w.topMm - Math.min(depth, hole.depthMm) + 0.02);
-        this.paper.add(cap);
-      });
     } else {
       const board = new THREE.Mesh(new THREE.BoxGeometry(w.widthMm, w.depthMm, drawingBoard.thicknessMm), material);
       board.position.set(w.centerXmm, w.centerYmm, w.bottomMm + drawingBoard.thicknessMm / 2); board.receiveShadow = true;
@@ -207,7 +182,6 @@ export class Workspace {
       sheet.position.set(w.centerXmm, w.centerYmm, w.topMm); sheet.receiveShadow = true;
       this.paper.add(board, sheet);
     }
-    this.holeCount = holes.length;
   }
 
   private showPose(q: number[]): void {
@@ -230,7 +204,6 @@ export class Workspace {
 
   show(snapshot: PlaybackSnapshot): void {
     this.showPose(snapshot.q);
-    if (this.config.id === 'drill' && this.holeCount !== snapshot.holes.length) this.buildWorkpiece(snapshot.holes);
     snapshot.ink.forEach((segment, i) => {
       // 笔迹投影到纸面并微小抬高；奶油条带保留实际 TCP 高度。
       const cream = this.config.id === 'cream';
@@ -247,7 +220,6 @@ export class Workspace {
   setRobotVisible(visible: boolean): void { this.robot.visible = visible; }
   clearInk(): void {
     this.ink.count = 0;
-    if (this.config.id === 'drill' && this.holeCount > 0) this.buildWorkpiece([]);
   }
   setGuideVisible(visible: boolean): void { this.guide.visible = visible; }
   setAxesVisible(visible: boolean): void { this.frameAxes.visible = visible; }

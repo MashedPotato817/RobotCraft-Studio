@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Box3, Vector3 } from 'three';
-import { createCraftJob, processes, type ProcessId } from '../src/process/craft';
+import { createCraftJob, type ProcessId } from '../src/process/craft';
 import { planPenJob, robotPose } from '../src/robot/planner';
 import { Playback } from '../src/simulation/playback';
 import type { PatternId } from '../src/design/patterns';
 
-const combinations = (['pen', 'drill', 'cream'] as ProcessId[]).flatMap(process =>
+const combinations = (['pen', 'cream'] as ProcessId[]).flatMap(process =>
   (['robot', 'zhong', 'flower'] as PatternId[]).map(pattern => ({ process, pattern })));
 
-describe('固定默认参数三工艺', () => {
+describe('固定默认参数双工艺', () => {
   it.each(combinations)('$process / $pattern 规划、间隙、结果与确定性播放', ({ process, pattern }) => {
     const job = createCraftJob(process, pattern);
     const result = planPenJob(job);
@@ -42,7 +42,6 @@ describe('固定默认参数三工艺', () => {
     const stepped = new Playback(plan); stepped.play();
     for (let frame = 0; frame < 60; frame++) stepped.advance(plan.duration / 120);
     const sampled = stepped.snapshot(), direct = slow.snapshot();
-    expect(sampled.holes).toEqual(direct.holes);
     expect(sampled.ink.length).toBe(direct.ink.length);
     sampled.tip.forEach((value, axis) => expect(value).toBeCloseTo(direct.tip[axis], 8));
     sampled.ink.forEach((segment, index) => segment.end.forEach((value, axis) => expect(value).toBeCloseTo(direct.ink[index].end[axis], 8)));
@@ -52,38 +51,13 @@ describe('固定默认参数三工艺', () => {
     const done = slow.snapshot();
     expect(done.state).toBe('completed');
     expect(done.drawnStrokes).toBe(plan.strokeCount);
-    if (process === 'drill') {
-      expect(done.ink).toEqual([]);
-      expect(done.holes.length).toBeGreaterThan(3);
-      done.holes.forEach(hole => {
-        expect(hole.depthMm).toBeCloseTo(processes.drill.holeDepthMm, 0);
-        expect(hole.depthMm).toBeLessThan(4);
-      });
-      const dwell = plan.samples.find(s => s.phase === 'dwell')!;
-      const first = new Playback(plan); first.play(); first.advance(dwell.time - 0.001);
-      expect(first.snapshot().holes).toHaveLength(0);
-      first.advance(0.002); expect(first.snapshot().holes).toHaveLength(1);
-    } else {
-      expect(done.ink.length).toBeGreaterThan(3);
-      expect(done.holes).toEqual([]);
-      expect(done.ink.every(s => Math.abs(s.end[2] - plan.surfaceZmm) <= 0.5)).toBe(true);
-      expect(done.ink.every(s => Math.hypot(...s.end.map((v, i) => v - s.start[i])) < 2)).toBe(true);
-    }
-    slow.play(); expect(slow.snapshot().ink).toEqual([]); expect(slow.snapshot().holes).toEqual([]);
+    expect(done.ink.length).toBeGreaterThan(3);
+    expect(done.ink.every(s => Math.abs(s.end[2] - plan.surfaceZmm) <= 0.5)).toBe(true);
+    expect(done.ink.every(s => Math.hypot(...s.end.map((v, i) => v - s.start[i])) < 2)).toBe(true);
+    slow.play(); expect(slow.snapshot().ink).toEqual([]);
     slow.advance(1000); expect(slow.snapshot()).toEqual(done);
     slow.reset(); expect(slow.snapshot().time).toBe(0); expect(slow.snapshot().drawnStrokes).toBe(0);
-    console.info(`${process}/${pattern}: ${plan.samples.length} 样本, ${plan.duration.toFixed(2)} s, ${plan.maxPositionErrorMm.toFixed(3)} mm, ${plan.maxOrientationErrorRad.toFixed(4)} rad, ${plan.strokeCount} 段/孔, 连杆中心线最小间隙 ${minimumClearance.toFixed(2)} mm`);
-  });
-
-  it('钻孔孔位去重且不穿透板材，停留时间与退刀高度来自配置', () => {
-    const job = createCraftJob('drill', 'flower');
-    const holes = job.targets.filter(t => t.phase === 'dwell');
-    expect(holes.every(t => t.holdSeconds === processes.drill.dwellSeconds)).toBe(true);
-    expect(holes.every(t => t.position[2] > processes.drill.workpiece.bottomMm)).toBe(true);
-    for (let i = 0; i < holes.length; i++) for (let j = i + 1; j < holes.length; j++) {
-      expect(Math.hypot(...holes[i].position.map((v, axis) => v - holes[j].position[axis]))).toBeGreaterThanOrEqual(processes.drill.radiusMm * 2 + 0.5);
-    }
-    expect(job.targets.at(-1)!.position[2]).toBe(processes.drill.liftMm);
+    console.info(`${process}/${pattern}: ${plan.samples.length} 样本, ${plan.duration.toFixed(2)} s, ${plan.maxPositionErrorMm.toFixed(3)} mm, ${plan.maxOrientationErrorRad.toFixed(4)} rad, ${plan.strokeCount} 笔画, 连杆中心线最小间隙 ${minimumClearance.toFixed(2)} mm`);
   });
 
   it('工艺切换保留所选图案，配置相互隔离', () => {

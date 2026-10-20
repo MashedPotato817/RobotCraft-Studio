@@ -28,7 +28,6 @@ export interface PenSample {
   target: Point3;
   phase: PenPhase;
   ink: number | null;
-  hole?: number;
 }
 export interface PenPlan {
   samples: PenSample[];
@@ -110,18 +109,18 @@ function planWithSeed(job: PenJob, startingSeed: number[]): PlanningResult {
         if (!armClearsBoard(robotPose(q, job.settings.penLengthMm).points, job.settings.surfaceZmm, job.config?.workpiece)) return boardFailure;
       }
       const distance = new Vector3(...previous.target).distanceTo(new Vector3(...target.position));
-      const speed = target.phase === 'draw' || target.phase === 'drill' ? job.settings.drawSpeedMmS : 30;
+      const speed = target.phase === 'draw' ? job.settings.drawSpeedMmS : 30;
       const jointTime = Math.max(...solved.q.map((value, i) => Math.abs(value - previous.q[i]) / (i === 2 ? 2 : 0.8)));
-      time += Math.max(distance / speed, jointTime, target.holdSeconds ?? 0, 1 / 120);
+      time += Math.max(distance / speed, jointTime, 1 / 120);
     }
-    samples.push({ time, q: [...solved.q], target: [...target.position], phase: target.phase, ink: target.ink, hole: target.hole });
+    samples.push({ time, q: [...solved.q], target: [...target.position], phase: target.phase, ink: target.ink });
     seed = solved.q;
   }
   return {
     ok: true,
     plan: {
       samples, duration: time, penLengthMm: job.settings.penLengthMm, surfaceZmm: job.settings.surfaceZmm,
-      strokeCount: job.config?.id === 'drill' ? new Set(samples.filter(s => s.hole !== undefined).map(s => s.hole)).size : new Set(samples.filter(s => s.ink !== null).map(s => s.ink)).size,
+      strokeCount: new Set(samples.filter(s => s.ink !== null).map(s => s.ink)).size,
       maxPositionErrorMm, maxOrientationErrorRad,
       config: job.config,
     },

@@ -3,7 +3,6 @@ import { tcpPose, type PenPlan } from '../robot/planner';
 
 export type PlaybackState = 'ready' | 'playing' | 'paused' | 'completed';
 export interface InkSegment { start: Point3; end: Point3; stroke: number }
-export interface CompletedHole { index: number; tip: Point3; depthMm: number }
 export interface PlaybackSnapshot {
   state: PlaybackState;
   time: number;
@@ -13,7 +12,6 @@ export interface PlaybackSnapshot {
   phase: PenPhase;
   ink: InkSegment[];
   drawnStrokes: number;
-  holes: CompletedHole[];
 }
 
 export class Playback {
@@ -77,19 +75,10 @@ export class Playback {
     };
     for (let i = 1; i < end; i++) append(this.tips[i - 1], this.tips[i], samples[i].ink);
     if (next && fraction > 0) append(this.tips[end - 1], tip, next.ink);
-    // 只有孔底停留完整执行后才标记完成；位置和深度来自同一 FK 执行记录。
-    const holes: CompletedHole[] = [];
-    for (let i = 1; i < end; i++) {
-      const sample = samples[i];
-      if (sample.phase === 'dwell' && sample.hole !== undefined) {
-        holes.push({ index: sample.hole, tip: this.tips[i], depthMm: this.plan.surfaceZmm - this.tips[i][2] });
-      }
-    }
     return {
       state: this.state, time: this.time, progress: this.time / this.plan.duration,
       q, tip, phase: next?.phase ?? previous.phase, ink,
-      drawnStrokes: this.plan.config?.id === 'drill' ? holes.length : new Set(ink.map(s => s.stroke)).size,
-      holes,
+      drawnStrokes: new Set(ink.map(s => s.stroke)).size,
     };
   }
 }

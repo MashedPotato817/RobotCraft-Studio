@@ -5,7 +5,7 @@ import { Playback, type PlaybackSnapshot } from '../simulation/playback';
 import { Workspace } from '../rendering/workspace';
 
 const icon = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M8 24V16l8-8 8 8v8M8 16h16M16 8V4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="17" r="3" fill="currentColor"/></svg>`;
-const phaseLabels = { travel: '空行程', lower: '接近工件', draw: '沿图案制作', lift: '抬起 / 退刀', drill: '下钻', dwell: '孔底停留' };
+const phaseLabels = { travel: '空行程', lower: '接近工件', draw: '沿图案制作', lift: '抬起' };
 
 function patternIcon(id: PatternId): string {
   const paths = patterns[id].strokes.map(stroke => `<polyline points="${stroke.map(([x, y]) => `${x * 85},${-y * 85}`).join(' ')}"/>`).join('');
@@ -16,7 +16,7 @@ export function mountWorkstation(root: HTMLElement): () => void {
   root.innerHTML = `
     <header class="topbar">
       <a class="brand" href="./" aria-label="RobotCraft Studio 首页"><span class="brand-mark">${icon}</span><span>RobotCraft <b>Studio</b><small>机器人创作工作站</small></span></a>
-      <div class="workspace-label"><span class="status-dot"></span><span id="workspaceName">笔绘工作站</span><span class="version-tag">三工艺仿真</span></div>
+      <div class="workspace-label"><span class="status-dot"></span><span id="workspaceName">笔绘工作站</span><span class="version-tag">双工艺仿真</span></div>
       <span class="top-note">从一个图案，到一件作品。</span>
     </header>
     <main class="studio">
@@ -99,7 +99,7 @@ export function mountWorkstation(root: HTMLElement): () => void {
     element('phaseLabel').textContent = snapshot.state === 'completed' ? '制作完成' : snapshot.state === 'ready' ? '轨迹就绪' : snapshot.state === 'paused' ? '已暂停' : phaseLabels[snapshot.phase];
     element('timeLabel').textContent = `${snapshot.time.toFixed(1)} / ${player!.plan.duration.toFixed(1)} s`;
     element<HTMLProgressElement>('progress').value = snapshot.progress;
-    element('drawnCount').textContent = `${process === 'drill' ? '已完成孔位' : '已绘笔画'} ${snapshot.drawnStrokes} / ${player!.plan.strokeCount}`;
+    element('drawnCount').textContent = `已绘笔画 ${snapshot.drawnStrokes} / ${player!.plan.strokeCount}`;
     playButton.textContent = snapshot.state === 'playing' ? '暂停制作' : snapshot.state === 'paused' ? '继续制作' : snapshot.state === 'completed' ? '重新制作' : '开始制作';
     element('jointData').innerHTML = jointTelemetry(snapshot.q).map(j => `<span>${j.name}<b>${j.value.toFixed(1)} ${j.unit}</b></span>`).join('');
     if (snapshot.state === 'completed') status('制作完成', '作品已保留。可以俯视检查，或重新制作。', 'completed');
@@ -128,9 +128,8 @@ export function mountWorkstation(root: HTMLElement): () => void {
     element('jointData').replaceChildren();
     const config = processes[process];
     element('workspaceName').textContent = `${config.name}工作站`;
-    element('totalLabel').textContent = process === 'drill' ? '孔位' : '笔画';
-    element('resultLegend').textContent = process === 'drill' ? '盲孔结果' : process === 'cream' ? '奶油条带' : '实际笔迹';
-    element('configSummary').textContent = process === 'drill' ? `板材 · 孔径 ${config.radiusMm * 2} mm · 孔深 ${config.holeDepthMm} mm · 间距 ${config.holeSpacingMm} mm` : process === 'cream' ? `圆形蛋糕 · 圆口 ${config.radiusMm * 2} mm · 单层奶油图案` : '纸面 · 墨蓝笔迹 · 平面书写';
+    element('resultLegend').textContent = process === 'cream' ? '奶油条带' : '实际笔迹';
+    element('configSummary').textContent = process === 'cream' ? `圆形蛋糕 · 圆口 ${config.radiusMm * 2} mm · 单层奶油图案` : '纸面 · 墨蓝笔迹 · 平面书写';
     try {
       const job = createCraftJob(process, pattern);
       workspace.setJob(job);
@@ -156,8 +155,8 @@ export function mountWorkstation(root: HTMLElement): () => void {
           playButton.disabled = false;
           resetButton.disabled = false;
           element('maxError').textContent = `${result.plan.maxPositionErrorMm.toFixed(2)} mm`;
-          element('strokeTotal').textContent = `${result.plan.strokeCount} ${process === 'drill' ? '孔' : '笔'}`;
-          status('轨迹就绪', process === 'drill' ? '钻孔与退刀路径已校验。盲孔为几何示意。' : process === 'cream' ? '喷嘴与抬起路径已校验。奶油为几何挤出。' : '笔尖与抬笔路径已校验，可以开始制作。', 'ready');
+          element('strokeTotal').textContent = `${result.plan.strokeCount} 笔`;
+          status('轨迹就绪', process === 'cream' ? '喷嘴与抬起路径已校验。奶油为几何挤出。' : '笔尖与抬笔路径已校验，可以开始制作。', 'ready');
           renderSnapshot(player.snapshot());
         };
         activeWorker.onerror = event => {

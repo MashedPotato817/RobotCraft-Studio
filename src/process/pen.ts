@@ -2,7 +2,7 @@ import { patterns, type PatternId } from '../design/patterns';
 import type { ProcessConfig } from './craft';
 
 export type Point3 = [number, number, number];
-export type PenPhase = 'travel' | 'lower' | 'draw' | 'lift' | 'drill' | 'dwell';
+export type PenPhase = 'travel' | 'lower' | 'draw' | 'lift';
 export interface PenSettings {
   pattern: PatternId;
   sizeMm: number;
@@ -17,8 +17,6 @@ export interface PenTarget {
   phase: PenPhase;
   /** 进入当前目标的加工段标识，用于出墨或挤出；null 表示不生成线条。 */
   ink: number | null;
-  hole?: number;
-  holdSeconds?: number;
 }
 export interface PenJob {
   settings: PenSettings;
