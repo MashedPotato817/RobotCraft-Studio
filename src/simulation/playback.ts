@@ -62,7 +62,9 @@ export class Playback {
     if (end === -1) end = samples.length;
     const previous = samples[Math.max(0, end - 1)];
     const next = samples[end];
-    const fraction = next ? Math.max(0, Math.min(1, (this.time - previous.time) / (next.time - previous.time))) : 0;
+    // 与样本搜索使用同一时间容差，避免分帧累加在边界多出零长度加工段。
+    const elapsed = this.time - previous.time;
+    const fraction = next && elapsed > 1e-9 ? Math.max(0, Math.min(1, elapsed / (next.time - previous.time))) : 0;
     const q = next ? previous.q.map((value, i) => value + (next.q[i] - value) * fraction) : [...previous.q];
     const tip = tcpPose(q, this.plan.penLengthMm);
     const ink: InkSegment[] = [];

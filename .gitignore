@@ -4,3 +4,5 @@ dist/
 coverage/
 *.tsbuildinfo
 *.local
+.playwright-cli/
+output/playwright/

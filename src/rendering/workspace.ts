@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { robotPose, restingQ } from '../robot/planner';
 import { defaultPenSettings, drawingBoard, type PenJob } from '../process/pen';
 import type { PlaybackSnapshot } from '../simulation/playback';
+import { processes, type ProcessConfig } from '../process/craft';
 
 const zAxis = new THREE.Vector3(0, 0, 1);
 const yAxis = new THREE.Vector3(0, 1, 0);
@@ -21,10 +22,13 @@ export class Workspace {
   private readonly paper = new THREE.Group();
   private readonly guide = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#6e9ab0', dashSize: 1.4, gapSize: 1, transparent: true, opacity: 0.55 }));
   private readonly inkMaterial = new THREE.MeshStandardMaterial({ color: '#24465f', roughness: 1 });
-  private readonly inkGeometry = new THREE.CylinderGeometry(1, 1, 1, 6);
+  private readonly inkGeometry = new THREE.CylinderGeometry(1, 1, 1, 24);
   private ink = new THREE.InstancedMesh(this.inkGeometry, this.inkMaterial, 1);
+  private readonly creamJointGeometry = new THREE.SphereGeometry(1, 24, 16);
+  private creamJoints = new THREE.InstancedMesh(this.creamJointGeometry, this.inkMaterial, 1);
   private penLengthMm = defaultPenSettings.penLengthMm;
   private surfaceZmm = defaultPenSettings.surfaceZmm;
+  private config: ProcessConfig = processes.pen;
   private frameAxes = new THREE.AxesHelper(14);
   private readonly matrix = new THREE.Matrix4();
   private readonly observer: ResizeObserver;
@@ -40,7 +44,7 @@ export class Workspace {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.append(this.renderer.domElement);
-    this.renderer.domElement.setAttribute('aria-label', '机械臂笔绘三维工作空间，拖动旋转视角，滚轮缩放');
+    this.renderer.domElement.setAttribute('aria-label', '机械臂创作三维工作空间，拖动旋转视角，滚轮缩放');
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.minDistance = 150;
@@ -108,7 +112,9 @@ export class Workspace {
     this.paper.add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(paperGrid, 3)), new THREE.LineBasicMaterial({ color: '#e5e9e3', transparent: true, opacity: 0.7 })));
     this.ink.count = 0;
     this.ink.frustumCulled = false;
-    this.scene.add(this.ink);
+    this.creamJoints.count = 0;
+    this.creamJoints.frustumCulled = false;
+    this.scene.add(this.ink, this.creamJoints);
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
     this.resize();
@@ -117,9 +123,17 @@ export class Workspace {
   }
 
   setJob(job: PenJob): void {
+    this.config = job.config ?? processes.pen;
     this.penLengthMm = job.settings.penLengthMm;
     this.surfaceZmm = job.settings.surfaceZmm;
-    this.paper.position.z = this.surfaceZmm;
+    this.buildWorkpiece();
+    const cream = this.config.id === 'cream';
+    this.toolBody.geometry.dispose();
+    this.toolBody.geometry = new THREE.CylinderGeometry(cream ? 1.8 : 1.9, cream ? 5 : 1.9, 1, 24);
+    (this.toolBody.material as THREE.MeshStandardMaterial).color.set(cream ? '#f3e2d3' : '#294e63');
+    this.toolTip.geometry.dispose();
+    this.toolTip.geometry = cream ? new THREE.CylinderGeometry(1.2, 1.8, 5, 24) : new THREE.ConeGeometry(1.9, 5, 16);
+    (this.toolTip.material as THREE.MeshStandardMaterial).color.set(cream ? '#b8c4c9' : '#c4a883');
     this.toolBody.scale.y = this.penLengthMm - 5;
     this.toolBody.position.z = (this.penLengthMm - 5) / 2;
     this.toolTip.position.z = this.penLengthMm - 2.5;
@@ -138,7 +152,47 @@ export class Workspace {
     this.ink.frustumCulled = false;
     this.ink.count = 0;
     this.scene.add(this.ink);
+    this.scene.remove(this.creamJoints);
+    this.creamJoints.dispose();
+    this.creamJoints = new THREE.InstancedMesh(this.creamJointGeometry, this.inkMaterial, (job.targets.length + 1) * 2);
+    this.creamJoints.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.creamJoints.frustumCulled = false;
+    this.creamJoints.count = 0;
+    this.scene.add(this.creamJoints);
+    this.inkMaterial.color.set(this.config.color);
     this.showPose(restingQ);
+    if (this.viewMode === 'top') this.topView();
+  }
+
+  private buildWorkpiece(): void {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    this.paper.traverse(object => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+        geometries.add(object.geometry);
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
+      }
+    });
+    this.paper.clear();
+    geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose());
+    const w = this.config.workpiece;
+    const material = new THREE.MeshStandardMaterial({ color: this.config.id === 'cream' ? '#fff1d9' : '#bca98c', roughness: 0.9 });
+    if (w.shape === 'circle') {
+      const cake = new THREE.Mesh(new THREE.CylinderGeometry(w.widthMm / 2, w.widthMm / 2, w.topMm - w.bottomMm, 96), material);
+      cake.rotation.x = Math.PI / 2;
+      cake.position.set(w.centerXmm, w.centerYmm, (w.topMm + w.bottomMm) / 2);
+      cake.receiveShadow = true; cake.castShadow = true;
+      this.paper.add(cake);
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(w.widthMm / 2 + 5, w.widthMm / 2 + 5, 0.8, 96), new THREE.MeshStandardMaterial({ color: '#d5ded8', metalness: 0.3, roughness: 0.6 }));
+      plate.rotation.x = Math.PI / 2; plate.position.set(w.centerXmm, w.centerYmm, w.bottomMm - 0.4);
+      this.paper.add(plate);
+    } else {
+      const board = new THREE.Mesh(new THREE.BoxGeometry(w.widthMm, w.depthMm, drawingBoard.thicknessMm), material);
+      board.position.set(w.centerXmm, w.centerYmm, w.bottomMm + drawingBoard.thicknessMm / 2); board.receiveShadow = true;
+      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(w.widthMm - 6, w.depthMm - 6), new THREE.MeshStandardMaterial({ color: '#fffdf6', roughness: 1, side: THREE.DoubleSide }));
+      sheet.position.set(w.centerXmm, w.centerYmm, w.topMm); sheet.receiveShadow = true;
+      this.paper.add(board, sheet);
+    }
   }
 
   private showPose(q: number[]): void {
@@ -161,21 +215,38 @@ export class Workspace {
 
   show(snapshot: PlaybackSnapshot): void {
     this.showPose(snapshot.q);
+    const cream = this.config.id === 'cream';
+    let jointCount = 0;
+    const jointScale = new THREE.Vector3().setScalar(this.config.radiusMm);
+    const addJoint = (point: THREE.Vector3) => {
+      this.matrix.compose(point, new THREE.Quaternion(), jointScale);
+      this.creamJoints.setMatrixAt(jointCount++, this.matrix);
+    };
     snapshot.ink.forEach((segment, i) => {
-      // 笔迹在纸面上呈现实际 TCP 的 XY 位置；微小抬高用于避免深度闪烁。
-      const start = new THREE.Vector3(segment.start[0], segment.start[1], this.surfaceZmm + 0.22);
-      const end = new THREE.Vector3(segment.end[0], segment.end[1], this.surfaceZmm + 0.22);
+      // 笔迹投影到纸面并微小抬高；奶油条带保留实际 TCP 高度。
+      const start = new THREE.Vector3(segment.start[0], segment.start[1], cream ? segment.start[2] : this.surfaceZmm + 0.22);
+      const end = new THREE.Vector3(segment.end[0], segment.end[1], cream ? segment.end[2] : this.surfaceZmm + 0.22);
       const direction = end.clone().sub(start);
-      this.matrix.compose(start.clone().lerp(end, 0.5), new THREE.Quaternion().setFromUnitVectors(yAxis, direction.clone().normalize()), new THREE.Vector3(0.32, Math.max(direction.length(), 0.001), 0.32));
+      this.matrix.compose(start.clone().lerp(end, 0.5), new THREE.Quaternion().setFromUnitVectors(yAxis, direction.lengthSq() > 1e-12 ? direction.clone().normalize() : yAxis), new THREE.Vector3(this.config.radiusMm, Math.max(direction.length(), 0.001), this.config.radiusMm));
       this.ink.setMatrixAt(i, this.matrix);
+      if (cream) {
+        // 同半径球面覆盖圆柱平口，让转折与起止端圆润；独立笔画不生成桥接线。
+        const previous = snapshot.ink[i - 1];
+        if (!previous || previous.stroke !== segment.stroke || previous.end.some((value, axis) => value !== segment.start[axis])) addJoint(start);
+        addJoint(end);
+      }
     });
     this.ink.count = snapshot.ink.length;
     this.ink.instanceMatrix.needsUpdate = true;
+    this.creamJoints.count = jointCount;
+    this.creamJoints.instanceMatrix.needsUpdate = true;
   }
 
-  setInkColor(color: string): void { this.inkMaterial.color.set(color); }
   setRobotVisible(visible: boolean): void { this.robot.visible = visible; }
-  clearInk(): void { this.ink.count = 0; }
+  clearInk(): void {
+    this.ink.count = 0;
+    this.creamJoints.count = 0;
+  }
   setGuideVisible(visible: boolean): void { this.guide.visible = visible; }
   setAxesVisible(visible: boolean): void { this.frameAxes.visible = visible; }
 
@@ -229,6 +300,7 @@ export class Workspace {
     geometries.forEach(g => g.dispose());
     materials.forEach(m => m.dispose());
     this.ink.dispose();
+    this.creamJoints.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

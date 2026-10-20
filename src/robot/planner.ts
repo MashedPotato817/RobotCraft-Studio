@@ -2,6 +2,7 @@ import { Quaternion, Vector3 } from 'three';
 import { COURSE_PRESETS, forwardKinematics, initialQ, joints, solvePoseIK } from '../core/robot';
 import type { PenJob, PenPhase, Point3 } from '../process/pen';
 import { armClearsBoard } from './board-clearance';
+import type { ProcessConfig } from '../process/craft';
 
 const mmPerUnit = 10;
 const down = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI);
@@ -36,6 +37,7 @@ export interface PenPlan {
   strokeCount: number;
   maxPositionErrorMm: number;
   maxOrientationErrorRad: number;
+  config?: ProcessConfig;
 }
 export type PlanningResult = { ok: true; plan: PenPlan } | {
   ok: false; code: 'not-converged' | 'path-discontinuity' | 'board-intersection'; message: string;
@@ -86,12 +88,12 @@ function planWithSeed(job: PenJob, startingSeed: number[]): PlanningResult {
     maxPositionErrorMm = Math.max(maxPositionErrorMm, error);
     maxOrientationErrorRad = Math.max(maxOrientationErrorRad, solved.orientationError);
     if (!solved.converged || error > 0.5 || solved.orientationError > 0.07) {
-      return { ok: false, code: 'not-converged', message: `第 ${index + 1} 个目标未通过求解校验（笔尖误差 ${error.toFixed(2)} mm），请调整图案位置或尺寸。` };
+      return { ok: false, code: 'not-converged', message: `第 ${index + 1} 个目标未通过求解校验（工具尖端误差 ${error.toFixed(2)} mm），请重新规划。` };
     }
     const boardFailure: PlanningResult = {
-      ok: false, code: 'board-intersection', message: '当前候选轨迹无法保持机械臂与画板的间隙，请调整图案位置或尺寸后重试。',
+      ok: false, code: 'board-intersection', message: '当前候选轨迹无法保持机械臂与工件的间隙，请重新规划。',
     };
-    if (!armClearsBoard(solvedPose.points, job.settings.surfaceZmm)) return boardFailure;
+    if (!armClearsBoard(solvedPose.points, job.settings.surfaceZmm, job.config?.workpiece)) return boardFailure;
     const previous = samples.at(-1);
     if (previous) {
       const midpointQ = solved.q.map((value, i) => (value + previous.q[i]) / 2);
@@ -101,10 +103,10 @@ function planWithSeed(job: PenJob, startingSeed: number[]): PlanningResult {
       const midpointAngle = new Quaternion(...robotPose(midpointQ, job.settings.penLengthMm).orientation).angleTo(down);
       maxPositionErrorMm = Math.max(maxPositionErrorMm, midpointError);
       maxOrientationErrorRad = Math.max(maxOrientationErrorRad, midpointAngle);
-      if (midpointError > 0.5 || midpointAngle > 0.07) return { ok: false, code: 'path-discontinuity', message: '关节插值偏离目标路径，请缩小图案或调整位置后重试。' };
+      if (midpointError > 0.5 || midpointAngle > 0.07) return { ok: false, code: 'path-discontinuity', message: '关节插值偏离目标路径，请重新规划。' };
       for (const fraction of [0.25, 0.5, 0.75]) {
         const q = previous.q.map((value, i) => value + (solved.q[i] - value) * fraction);
-        if (!armClearsBoard(robotPose(q, job.settings.penLengthMm).points, job.settings.surfaceZmm)) return boardFailure;
+        if (!armClearsBoard(robotPose(q, job.settings.penLengthMm).points, job.settings.surfaceZmm, job.config?.workpiece)) return boardFailure;
       }
       const distance = new Vector3(...previous.target).distanceTo(new Vector3(...target.position));
       const speed = target.phase === 'draw' ? job.settings.drawSpeedMmS : 30;
@@ -120,6 +122,7 @@ function planWithSeed(job: PenJob, startingSeed: number[]): PlanningResult {
       samples, duration: time, penLengthMm: job.settings.penLengthMm, surfaceZmm: job.settings.surfaceZmm,
       strokeCount: new Set(samples.filter(s => s.ink !== null).map(s => s.ink)).size,
       maxPositionErrorMm, maxOrientationErrorRad,
+      config: job.config,
     },
   };
 }
